@@ -46,11 +46,13 @@ class Bot:
                     else:
                         break
 
+                planets = game_map.all_planets()
+                all_ships = [s for s in game_map._all_ships() if s not in ships]
                 planet = nearest_planet
-                if ship.can_dock(planet):
+                if planet is not None and ship.can_dock(planet):
                     command_queue.append(ship.dock(planet))
                 else:
-                    if nearest_planet.calculate_distance_between(ship) > nearest_ship.calculate_distance_between(ship):
+                    if planet is None or nearest_planet.calculate_distance_between(ship) > nearest_ship.calculate_distance_between(ship):
                         entity_to_move_towards = nearest_ship
                     else:
                         entity_to_move_towards = nearest_planet
@@ -67,7 +69,7 @@ class Bot:
         # GAME END
 
 
-bot = Bot("Settler")
+bot = Bot("Settler_V5")
 bot.play()
 
 
