@@ -1,5 +1,6 @@
 import hlt
 import logging
+from collections import OrderedDict
 
 
 class Bot:
@@ -19,48 +20,48 @@ class Bot:
             game_map = game.update_map()
 
             command_queue = []
+
             ships = game_map.get_me().all_ships()
+            pid = game_map.get_me().id
             for ship in ships:
                 if ship.docking_status != ship.DockingStatus.UNDOCKED:
                     continue
 
                 entities_by_distance = game_map.nearby_entities_by_distance(ship)
-                nearest_planet = None
-                for distance in sorted(entities_by_distance):
-                    nearest_planet = next((nearest_entity for nearest_entity in entities_by_distance[distance]
-                                           if isinstance(nearest_entity, hlt.entity.Planet)), None)
+                entities_by_distance = OrderedDict(sorted(entities_by_distance.items(), key=lambda t: t[0]))
+                closest_empty_planets = [entities_by_distance[distance][0] for distance in entities_by_distance if isinstance(entities_by_distance[distance][0], hlt.entity.Planet) and not entities_by_distance[distance][0].is_owned()]
 
-                    if nearest_planet is None or nearest_planet.is_owned():
-                        continue
+                closest_enemy_ships = [entities_by_distance[distance][0] for distance in entities_by_distance if isinstance(entities_by_distance[distance][0], hlt.entity.Ship) and not entities_by_distance[distance][0] not in ships]
+
+                closest_enemy_planets = [entities_by_distance[distance][0] for distance in entities_by_distance if isinstance(entities_by_distance[distance][0], hlt.entity.Planet) and not entities_by_distance[distance][0].owner != pid]
+
+                logging.info(len(closest_enemy_planets))
+
+                # planets = game_map.all_planets()
+                # all_ships = [s for s in game_map._all_ships() if s not in ships]
+
+                if len(closest_empty_planets) > 0:
+                    nearest_planet = closest_empty_planets[0]
+                    if ship.can_dock(nearest_planet):
+                        command_queue.append(ship.dock(nearest_planet))
                     else:
-                        break
+                        navigate_command = ship.navigate(
+                            ship.closest_point_to(nearest_planet), game_map, speed=self.speed, ignore_ships=False)
 
-                nearest_ship = None
-                for distance in sorted(entities_by_distance):
-                    nearest_ship = next((nearest_entity for nearest_entity in entities_by_distance[distance] if
-                                         isinstance(nearest_entity, hlt.entity.Ship) and nearest_entity not in ships),
-                                        None)
-
-                    if nearest_ship is None:
-                        continue
-                    else:
-                        break
-
-                planets = game_map.all_planets()
-                all_ships = [s for s in game_map._all_ships() if s not in ships]
-                planet = nearest_planet
-                if planet is not None and ship.can_dock(planet):
-                    command_queue.append(ship.dock(planet))
-                else:
-                    if planet is None or nearest_planet.calculate_distance_between(ship) > nearest_ship.calculate_distance_between(ship):
-                        entity_to_move_towards = nearest_ship
-                    else:
-                        entity_to_move_towards = nearest_planet
+                        if navigate_command:
+                            command_queue.append(navigate_command)
+                elif len(closest_enemy_ships) > 0:
+                    nearest_ship = closest_enemy_ships[0]
                     navigate_command = ship.navigate(
-                        ship.closest_point_to(entity_to_move_towards),
-                        game_map,
-                        speed=self.speed,
-                        ignore_ships=True)
+                        ship.closest_point_to(nearest_ship), game_map, speed=self.speed, ignore_ships=False)
+
+                    if navigate_command:
+                        command_queue.append(navigate_command)
+                elif len(closest_enemy_planets) > 0:
+                    nearest_enemy_planet = closest_enemy_planets[0]
+                    navigate_command = ship.navigate(
+                        ship.closest_point_to(nearest_enemy_planet), game_map, speed=self.speed, ignore_ships=False)
+
                     if navigate_command:
                         command_queue.append(navigate_command)
 
@@ -69,7 +70,7 @@ class Bot:
         # GAME END
 
 
-bot = Bot("Settler_V5")
+bot = Bot("exMachina_V6")
 bot.play()
 
 
